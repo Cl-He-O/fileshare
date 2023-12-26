@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap-utilities.css">
+    <title>File Upload</title>
+</head>
+
+<body>
+
+    <main class="container">
+
+        <nav>
+            <ul>
+                <li><strong>File Upload</strong></li>
+            </ul>
+        </nav>
+
+        <input type="file" id="selector" style="display: none;">
+
+        <article id="upload">
+            <div class="text-center">
+                <span id="hint">Click to choose file, drop file here or use CTRL-V to paste file</span>
+                <div id="preview" style="display: none;">
+                    <div class="">
+                        <img id="img">
+                    </div>
+                    <span id="filename"></span>
+                </div>
+            </div>
+        </article>
+
+        <br>
+
+        <div id="progress" style="display: none;">
+            Uploading...
+            <progress value="0" max="100" id="progress-bar"></progress>
+        </div>
+
+        <button id="btn">Upload</button>
+
+        <dialog id="dialog">
+            <article style="min-width: 50vw;">
+                <header id="dialog-header">
+                    Upload failed
+                </header>
+                <p id="dialog-content"></p>
+                <br>
+                <form><button formmethod="dialog">Close</button></form>
+            </article>
+        </dialog>
+
+        <script>
+            let file = undefined
+            function updateFile(f) {
+                file = f
+
+                // image preview
+                let reader = new FileReader()
+                reader.onload = function (evnet) {
+                    document.getElementById("img").setAttribute("src", evnet.target.result)
+                }
+                reader.readAsDataURL(f)
+
+                document.getElementById("filename").textContent = f.name
+                if (file === undefined) {
+                    document.getElementById("preview").style.display = "none"
+                    document.getElementById("hint").style.display = ""
+                } else {
+                    document.getElementById("preview").style.display = ""
+                    document.getElementById("hint").style.display = "none"
+                }
+            }
+
+            function showDialog(msg, title) {
+                document.getElementById("dialog-content").innerText = msg
+                document.getElementById("dialog-header").innerText = title || "Upload failed"
+                document.getElementById("dialog").showModal()
+            }
+
+            let btn = document.getElementById("btn")
+            btn.addEventListener("click", () => {
+                if (file === undefined) {
+                    showDialog("image not selected")
+                    return
+                }
+
+                // form data
+                let formData = new FormData()
+                formData.set("file", file)
+
+                // post
+                let xhr = new XMLHttpRequest();
+                xhr.open('POST', '/upload' + location.search, true);
+                xhr.upload.onprogress = e => {
+                    // update progress bar
+                    let progess = Math.floor((e.loaded / e.total) * 100)
+                    document.getElementById("progress-bar").setAttribute("value", progess)
+                };
+                xhr.onload = e => {
+                    // request completed
+                    let data = JSON.parse(xhr.response)
+                    if (data.success) {
+                        showDialog("success", "Upload successful")
+                    } else {
+                        showDialog(data.message)
+                    }
+
+                    // hide progress bar
+                    document.getElementById("progress").style.display = "none";
+                    // enable button
+                    btn.setAttribute("diabled", false)
+                }
+                xhr.onerror = (e, a, b) => {
+                    // reqeust failed
+                    showDialog("network error")
+
+                    // hide progress bar
+                    document.getElementById("progress").style.display = "none";
+                    // enable button
+                    btn.setAttribute("diabled", false)
+                }
+                xhr.send(formData);
+
+                // show progress bar
+                document.getElementById("progress").style.display = "";
+                // disable button
+                btn.setAttribute("diabled", true)
+            })
+
+            let upload = document.getElementById("upload")
+            upload.addEventListener("click", () => {
+                selector.click()
+            })
+
+            // drop
+            upload.addEventListener("drop", (event) => {
+                event.preventDefault()
+                updateFile(event.dataTransfer.files[0])
+            })
+            upload.addEventListener("dragover", (event) => {
+                event.preventDefault()
+            })
+
+            let selector = document.getElementById("selector")
+            selector.addEventListener("change", (event) => {
+                // file selected using pop up dialog
+                updateFile(selector.files[0])
+            })
+
+            // paste
+            document.addEventListener("paste", function (e) {
+                updateFile(e.clipboardData.files[0])
+            })
+        </script>
+    </main>
+</body>
+
+</html>

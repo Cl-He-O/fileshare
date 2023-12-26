@@ -1,0 +1,11 @@
+This is a file sharing server
+
+Usage:
+  help:                                       display this help info (default)
+  run -c <config path>:                       start the server
+  new -c <config path>                        generate new signed access
+      -k <key>                                signing key, overrides config
+      -x <token>                              token, randomly generated if not provided
+      -p <permission>                         either w or r, default: w
+      -t <duration>                           duration the access will be valid for, default: 10min
+      -s <size>                               maximum size of the upload, default: 10MB
