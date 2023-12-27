@@ -13,8 +13,10 @@ import (
 )
 
 func decode_access(key []byte, r *http.Request) *Access {
-	csig_s := r.FormValue("sig")
-	access_s := r.FormValue("access")
+	q := r.URL.Query()
+
+	csig_s := q.Get("sig")
+	access_s := q.Get("access")
 
 	csig, err := b64.DecodeString(csig_s)
 	if err != nil {
@@ -28,7 +30,7 @@ func decode_access(key []byte, r *http.Request) *Access {
 		return nil
 	}
 
-	access_b, err := b64.DecodeString(r.FormValue("access"))
+	access_b, err := b64.DecodeString(access_s)
 	if err != nil {
 		slog.Debug("DecodeString", "err", err)
 		return nil
@@ -75,11 +77,7 @@ func serve(config Config) {
 				return
 			}
 
-			err = r.ParseMultipartForm(access.MaxSize)
-			if err != nil {
-				slog.Debug("ParseMultipartForm", "err", err)
-				return
-			}
+			r.Body = http.MaxBytesReader(w, r.Body, access.MaxSize)
 
 			f, h, err := r.FormFile("file")
 			if err != nil {
@@ -92,9 +90,18 @@ func serve(config Config) {
 			cd := mime.FormatMediaType("attachment", map[string]string{"filename": h.Filename})
 			opts := minio.PutObjectOptions{ContentDisposition: cd, ContentType: h.Header.Get("Content-Type")}
 
-			mio.PutObject(config.Minio.Bucket, access.Token, f, h.Size, opts)
+			response := make(map[string]any)
 
-			resp, _ := json.Marshal(map[string]bool{"success": true})
+			_, err = mio.PutObject(config.Minio.Bucket, access.Token, f, h.Size, opts)
+			if err != nil {
+				msg := "failed uploading to storage"
+				slog.Warn(msg, "err", err)
+				response["message"] = msg
+			} else {
+				response["success"] = true
+			}
+
+			resp, _ := json.Marshal(response)
 			w.Write(resp)
 		} else if r.Method == http.MethodGet {
 			w.Write(upload)
@@ -115,13 +122,13 @@ func serve(config Config) {
 
 			object, err := mio.GetObject(config.Minio.Bucket, access.Token, minio.GetObjectOptions{})
 			if err != nil {
-				slog.Debug("GetObject", "err", err)
+				slog.Warn("GetObject", "err", err)
 				return
 			}
 
 			info, err := object.Stat()
 			if err != nil {
-				slog.Debug("Stat", "err", err)
+				slog.Warn("Stat", "err", err)
 				return
 			}
 
