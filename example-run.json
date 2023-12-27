@@ -7,6 +7,5 @@
     "secret": "dcg1fiISO5V2Xgktx60ArERiYRFcALhjK2RpkXc1",
     "bucket": "test",
     "usessl": false
-  },
-  "url": "http://127.0.0.1:8080/"
+  }
 }
