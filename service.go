@@ -89,7 +89,7 @@ func serve(config Config) {
 
 			slog.Debug("uploading", "filename", h.Filename)
 
-			cd := mime.FormatMediaType("Content-Disposition", map[string]string{"filename": h.Filename})
+			cd := mime.FormatMediaType("attachment", map[string]string{"filename": h.Filename})
 			opts := minio.PutObjectOptions{ContentDisposition: cd, ContentType: h.Header.Get("Content-Type")}
 
 			mio.PutObject(config.Minio.Bucket, access.Token, f, h.Size, opts)
@@ -128,7 +128,7 @@ func serve(config Config) {
 			w.Header().Set("Content-Type", info.ContentType)
 			w.Header().Set("Content-Disposition", info.Metadata.Get("Content-Disposition"))
 
-			http.ServeContent(w, r, info.Metadata.Get("filename"), time.Time{}, object)
+			http.ServeContent(w, r, "", time.Time{}, object)
 		}
 	})
 

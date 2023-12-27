@@ -46,6 +46,11 @@ func sign_s(key []byte, s string) []byte {
 	return sig[:]
 }
 
+func add_flag(p *string, short string, long string, value string) {
+	flag.StringVar(p, short, value, "")
+	flag.StringVar(p, long, value, "")
+}
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
@@ -63,12 +68,13 @@ func main() {
 		max_size_s  string
 	)
 
-	flag.StringVar(&config_path, "c", "config.json", "")
-	flag.StringVar(&key_s, "k", "", "")
-	flag.StringVar(&token, "x", "", "")
-	flag.StringVar(&permission, "p", "w", "")
-	flag.StringVar(&duration_s, "t", "10m", "")
-	flag.StringVar(&max_size_s, "s", "10MB", "")
+	add_flag(&config_path, "c", "config", "config.json")
+	add_flag(&key_s, "k", "key", "")
+	add_flag(&token, "t", "token", "")
+	add_flag(&permission, "p", "permission", "w")
+	add_flag(&duration_s, "d", "duration", "10m")
+	add_flag(&max_size_s, "s", "size", "10MB")
+
 	flag.CommandLine.Parse(os.Args[2:])
 
 	config := parse_config(config_path)
@@ -110,7 +116,8 @@ func main() {
 			if permission == "w" {
 				config.URL += "upload"
 			} else if permission != "r" {
-				fmt.Printf("unsupported permission \"%s\", should be either \"r\" or \"w\"", permission)
+				fmt.Printf("unsupported permission \"%s\", should be either \"w\" or \"r\"\n", permission)
+				return
 			}
 
 			fmt.Println(config.URL + sign(config.key, access))
