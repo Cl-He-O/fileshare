@@ -4,15 +4,14 @@ import (
 	"crypto/rand"
 	_ "embed"
 	"encoding/base64"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"time"
 
 	"github.com/dustin/go-humanize"
-	"golang.org/x/crypto/sha3"
 )
 
 //go:embed upload.html
@@ -30,27 +29,6 @@ type Access struct {
 	Permission string `json:"permission"`
 }
 
-func sign(key []byte, access Access) string {
-	access_b, err := json.Marshal(access)
-	if err != nil {
-		panic(err)
-	}
-
-	access_s := b64.EncodeToString(access_b)
-	sig := b64.EncodeToString(sign_s(key, access_s))
-	return fmt.Sprintf("?sig=%s&access=%s", sig, access_s)
-}
-
-func sign_s(key []byte, s string) []byte {
-	sig := sha3.Sum256(append(key, s...))
-	return sig[:]
-}
-
-func add_flag(p *string, short string, long string, value string) {
-	flag.StringVar(p, short, value, "")
-	flag.StringVar(p, long, value, "")
-}
-
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 
@@ -61,7 +39,6 @@ func main() {
 
 	var (
 		config_path string
-		key_s       string
 		token       string
 		permission  string
 		duration_s  string
@@ -69,7 +46,6 @@ func main() {
 	)
 
 	add_flag(&config_path, "c", "config", "config.json")
-	add_flag(&key_s, "k", "key", "")
 	add_flag(&token, "t", "token", "")
 	add_flag(&permission, "p", "permission", "w")
 	add_flag(&duration_s, "d", "duration", "10m")
@@ -86,15 +62,6 @@ func main() {
 		}
 	case "new":
 		{
-			if key_s != "" {
-				key, err := b64.DecodeString(key_s)
-				if err != nil {
-					panic(err)
-				}
-
-				config.key = key
-			}
-
 			if token == "" {
 				t := make([]byte, 8)
 				rand.Read(t)
@@ -116,11 +83,16 @@ func main() {
 			if permission == "w" {
 				config.URL += "upload"
 			} else if permission != "r" {
-				fmt.Printf("unsupported permission \"%s\", should be either \"w\" or \"r\"\n", permission)
-				return
+				panic(fmt.Sprintf("unsupported permission \"%s\", should be either \"w\" or \"r\"\n", permission))
 			}
 
-			fmt.Println(config.URL + sign(config.key, access))
+			u, err := url.Parse(config.URL)
+			if err != nil {
+				panic(err)
+			}
+
+			u.RawQuery = sign(config.key, access).Encode()
+			fmt.Println(u)
 		}
 	}
 }
