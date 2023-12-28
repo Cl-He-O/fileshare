@@ -43,6 +43,11 @@ func decode_access(key []byte, r *http.Request) *Access {
 		return nil
 	}
 
+	if time.Now().Unix() > access.Until {
+		slog.Debug("token expired")
+		return nil
+	}
+
 	return &access
 }
 
@@ -69,11 +74,6 @@ func serve(config Config) {
 
 			if access.Permission != "w" {
 				slog.Debug("no write permission")
-				return
-			}
-
-			if time.Now().Unix() > access.Until {
-				slog.Debug("token expired")
 				return
 			}
 
@@ -104,6 +104,11 @@ func serve(config Config) {
 			resp, _ := json.Marshal(response)
 			w.Write(resp)
 		} else if r.Method == http.MethodGet {
+			access := decode_access(config.key, r)
+			if access == nil {
+				return
+			}
+
 			w.Write(upload)
 		}
 	})
