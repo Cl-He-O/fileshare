@@ -23,10 +23,10 @@ var help string
 var b64 = base64.RawURLEncoding
 
 type Access struct {
-	Token      string `json:"token"`
-	Until      int64  `json:"until"`
-	MaxSize    int64  `json:"max_size"`
-	Permission string `json:"permission"`
+	Token      string `json:"t"`
+	Until      int64  `json:"u"`
+	MaxSize    int64  `json:"s"`
+	Permission string `json:"p"`
 }
 
 func main() {
