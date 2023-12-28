@@ -79,15 +79,15 @@ func main() {
 
 			access := Access{Token: token, Until: time.Now().Add(duration).Unix(), MaxSize: int64(max_size), Permission: permission}
 
-			if permission == "w" {
-				config.URL += "upload"
-			} else if permission != "r" {
-				panic(fmt.Sprintf("unsupported permission \"%s\", should be either \"w\" or \"r\"\n", permission))
-			}
-
 			u, err := url.Parse(config.URL)
 			if err != nil {
 				panic(err)
+			}
+
+			if permission == "w" {
+				u = u.JoinPath("upload")
+			} else if permission != "r" {
+				panic(fmt.Sprintf("unsupported permission \"%s\", should be either \"w\" or \"r\"\n", permission))
 			}
 
 			u.RawQuery = sign(config.key, access).Encode()
