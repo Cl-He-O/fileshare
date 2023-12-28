@@ -2,8 +2,8 @@ This is a file sharing server
 
 Usage:
   help                                        display this help info (default)
-  run -c, --config=<config path>              start the server
-  new -c, --config=<config path>              generate new signed access
+  run -c, --config=<path | config.json>       start the server
+  new -c, --config=<path | config.json>       generate new signed access
       -t, --token=<token>                     randomly generated if not provided
       -p, --permission=<permission | w>       w for write-only, r for read-only
       -d, --duration=<duration | 10min>       duration the access will be valid for
