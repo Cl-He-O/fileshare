@@ -66,6 +66,8 @@ func main() {
 				t := make([]byte, 8)
 				rand.Read(t)
 				token = b64.EncodeToString(t)
+
+				fmt.Fprintln(os.Stderr, token)
 			}
 
 			duration, err := time.ParseDuration(duration_s)
