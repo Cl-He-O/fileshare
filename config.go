@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"os"
 )
@@ -36,7 +37,7 @@ func parse_config(path string) Config {
 		panic(err)
 	}
 
-	config.key, err = b64.DecodeString(config.Key)
+	config.key, err = base64.StdEncoding.DecodeString(config.Key)
 	if err != nil {
 		panic(err)
 	}

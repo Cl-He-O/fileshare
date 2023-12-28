@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/rand"
 	_ "embed"
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -19,8 +18,6 @@ var upload []byte
 
 //go:embed help.txt
 var help string
-
-var b64 = base64.RawURLEncoding
 
 type Access struct {
 	Token      string `json:"t"`

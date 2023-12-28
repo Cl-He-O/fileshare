@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"net/url"
 
 	"golang.org/x/crypto/sha3"
 )
+
+var b64 = base64.RawURLEncoding
 
 func sign(key []byte, access Access) url.Values {
 	access_b, err := json.Marshal(access)

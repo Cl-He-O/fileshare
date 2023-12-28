@@ -8,6 +8,3 @@ Usage:
       -p, --permission=<permission | w>       w for write-only, r for read-only
       -d, --duration=<duration | 10min>       duration the access will be valid for
       -s, --size=<size | 10MB>                maximum size of the upload request
-
-About config:
-  base64 encoding used is URL-safe without padding
