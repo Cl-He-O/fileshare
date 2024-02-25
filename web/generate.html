@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap-utilities.css">
+  <title>Generate</title>
+</head>
+
+<body>
+  <main class="container">
+    <input type="password" placeholder="Password" aria-label="Password" id="secret" />
+    <input type="text" placeholder="Token" aria-label="Token" id="token" />
+    <input type="number" placeholder="Duration (minutes)" aria-label="Duration in minutes" id="duration-minutes" />
+    <input type="number" placeholder="Maximum size (megabytes)" aria-label="Maximum size of file" id="max-size" />
+
+    <button id="btn-genread" onclick="genqrcode('r')">Generate Read Access</button>
+    <button id="btn-genwrite" onclick="genqrcode('w')">Generate Write Access</button>
+
+    <a id="link" href="" target="_blank" class="text-center">
+      <div id="qrcode"></div>
+    </a>
+
+    <script src="https://cdn.jsdelivr.net/gh/papnkukn/qrcode-svg@master/dist/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/dist/sha3.umd.min.js"></script>
+
+    <script>
+      function b64urlencode(data) {
+        if (typeof (data) != "string") {
+          data = btoa(String.fromCharCode(...data))
+        } else {
+          data = btoa(data)
+        }
+
+        // url safe
+        data = data.replace(/\+/g, '-').replace(/\//g, '_');
+        // remove padding
+        data = data.replace(/=+$/, '');
+
+        return data
+      }
+
+      async function sign(secret, access_s) {
+        access_s = (new TextEncoder()).encode(access_s)
+        let data = new Uint8Array(secret.length + access_s.length)
+        data.set(secret, 0)
+        data.set(access_s, secret.length)
+
+        hasher = await hashwasm.createSHA3(256)
+        hasher.init()
+        hasher.update(data)
+        sig = hasher.digest("binary")
+
+        return b64urlencode(sig)
+      }
+
+      async function genqrcode(p) {
+        let secret = atob(document.getElementById("secret").value)
+        let length = secret.length;
+        let bytes = new Uint8Array(length);
+        for (let i = 0; i < length; i++) {
+          bytes[i] = secret.charCodeAt(i);
+        }
+        secret = bytes
+
+        let token = document.getElementById("token").value
+        let duration_mins = document.getElementById("duration-minutes").value
+        let max_size = parseInt(document.getElementById("max-size").value)
+
+        let url = new URL(window.origin)
+        if (p == "w") {
+          url.pathname = "/upload"
+        }
+
+        let access = { "t": token, "u": Math.floor(duration_mins * 60 + Date.now() / 1000), "s": max_size * 1000000, "p": p }
+        access = JSON.stringify(access)
+        let access_s = b64urlencode(access)
+        url.searchParams.append("sig", await sign(secret, access_s))
+        url.searchParams.append("access", access_s)
+
+        url = url.toString()
+
+        let qrcode = new QRCode({ "content": url, "width": 512, "height": 512 }).svg()
+        document.getElementById("qrcode").innerHTML = qrcode
+        document.getElementById("link").href = url
+      }
+    </script>
+  </main>
+</body>
+
+</html>

@@ -13,9 +13,6 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-//go:embed upload.html
-var upload []byte
-
 //go:embed help.txt
 var help string
 
@@ -75,6 +72,10 @@ func main() {
 			max_size, err := humanize.ParseBytes(max_size_s)
 			if err != nil {
 				panic(err)
+			}
+
+			if permission == "r" {
+				max_size = 0
 			}
 
 			access := Access{Token: token, Until: time.Now().Add(duration).Unix(), MaxSize: int64(max_size), Permission: permission}

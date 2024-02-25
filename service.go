@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/subtle"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -12,6 +13,12 @@ import (
 	"github.com/minio/minio-go"
 )
 
+//go:embed web/upload.html
+var upload []byte
+
+//go:embed web/generate.html
+var generate []byte
+
 func decode_access(key []byte, r *http.Request) *Access {
 	q := r.URL.Query()
 
@@ -20,7 +27,7 @@ func decode_access(key []byte, r *http.Request) *Access {
 
 	csig, err := b64.DecodeString(csig_s)
 	if err != nil {
-		slog.Debug("DecodeString", "err", err)
+		slog.Debug("csig DecodeString", "err", err)
 		return nil
 	}
 
@@ -32,7 +39,7 @@ func decode_access(key []byte, r *http.Request) *Access {
 
 	access_b, err := b64.DecodeString(access_s)
 	if err != nil {
-		slog.Debug("DecodeString", "err", err)
+		slog.Debug("access_b DecodeString", "err", err)
 		return nil
 	}
 
@@ -141,6 +148,12 @@ func serve(config Config) {
 			w.Header().Set("Content-Disposition", info.Metadata.Get("Content-Disposition"))
 
 			http.ServeContent(w, r, "", time.Time{}, object)
+		}
+	})
+
+	http.HandleFunc("/gen", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Write(generate)
 		}
 	})
 
