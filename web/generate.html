@@ -1,30 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 
 <head>
   <meta charset="utf-8">
   <meta name="robots" content="noindex">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap-utilities.css">
-  <title>Generate</title>
+  <link rel="stylesheet" href="/gen/form.css">
+  <title>Access Generating</title>
 </head>
 
 <body>
   <main class="container">
-    <input type="password" placeholder="Password" aria-label="Password" id="secret" />
-    <input type="text" placeholder="Token" aria-label="Token" id="token" />
-    <input type="number" placeholder="Duration (minutes)" aria-label="Duration in minutes" id="duration-minutes" />
-    <input type="number" placeholder="Maximum size (megabytes)" aria-label="Maximum size of file" id="max-size" />
+    <nav>
+      <ul>
+        <li><strong>Access Generating</strong></li>
+      </ul>
+    </nav>
 
-    <button id="btn-genread" onclick="genqrcode('r')">Generate Read Access</button>
-    <button id="btn-genwrite" onclick="genqrcode('w')">Generate Write Access</button>
+    <form>
+      <div>
+        <label for="secret" class="form-label">Secret</label>
+        <input type="password" class="form-control is-valid" aria-label="Secret" id="secret" />
+        <div class="invalid-feedback">
+          Please enter a valid base64-encoded string
+        </div>
+      </div><br>
+
+      <div>
+        <label for="token" class="form-label">Token</label>
+        <input type="text" class="form-control is-valid" aria-label="Token" id="token" />
+        <div class="invalid-feedback">
+          Please provide token
+        </div>
+      </div><br>
+
+      <div>
+        <label for="duration-minutes" class="form-label">Duration (minutes)</label>
+        <input type="number" class="form-control" placeholder="10" aria-label="Duration in minutes"
+          id="duration-minutes" />
+      </div><br>
+
+      <div>
+        <label for="max-size" class="form-label">Maximum size (megabytes)</label>
+        <input type="number" class="form-control" placeholder="10" aria-label="Maximum size of file" id="max-size" />
+      </div><br>
+    </form>
+
+    <div class="grid">
+      <button id="btn-genread" onclick="genqrcode('r')">Generate Read Access</button>
+      <button id="btn-genwrite" onclick="genqrcode('w')">Generate Write Access</button>
+    </div><br>
 
     <a id="link" href="" target="_blank" class="text-center">
       <div id="qrcode"></div>
     </a>
 
-    <script src="https://cdn.jsdelivr.net/gh/papnkukn/qrcode-svg@master/dist/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/papnkukn/qrcode-svg@1.1.0/dist/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/dist/sha3.umd.min.js"></script>
 
     <script>
@@ -58,27 +91,52 @@
       }
 
       async function genqrcode(p) {
-        let secret = atob(document.getElementById("secret").value)
-        let length = secret.length;
-        let bytes = new Uint8Array(length);
-        for (let i = 0; i < length; i++) {
+        var secret
+        try {
+          secret = atob(document.getElementById("secret").value)
+        } catch (e) {
+          document.getElementById("secret").classList.replace("is-valid", "is-invalid")
+          return
+        }
+
+        document.getElementById("secret").classList.replace("is-invalid", "is-valid")
+
+        const bytes = new Uint8Array(secret.length);
+        for (let i = 0; i < secret.length; i++) {
           bytes[i] = secret.charCodeAt(i);
         }
         secret = bytes
 
-        let token = document.getElementById("token").value
-        let duration_mins = document.getElementById("duration-minutes").value
-        let max_size = parseInt(document.getElementById("max-size").value)
+        const token = document.getElementById("token")
+
+        if (token.value == "") {
+          token.classList.replace("is-valid", "is-invalid")
+          return
+        }
+
+        token.classList.replace("is-invalid", "is-valid")
+
+        const duration_mins = document.getElementById("duration-minutes")
+        const max_size = document.getElementById("max-size")
+
+        const access = {
+          "t": token.value,
+          "u": Math.floor((duration_mins.value || duration_mins.placeholder) * 60 + Date.now() / 1000),
+          "p": p
+        }
+        if (p == "w") {
+          access.s = Math.floor((max_size.value || max_size.placeholder) * 1000000)
+        }
+
+        const access_s = b64urlencode(JSON.stringify(access))
+        const sig = await sign(secret, access_s)
 
         let url = new URL(window.origin)
         if (p == "w") {
           url.pathname = "/upload"
         }
 
-        let access = { "t": token, "u": Math.floor(duration_mins * 60 + Date.now() / 1000), "s": max_size * 1000000, "p": p }
-        access = JSON.stringify(access)
-        let access_s = b64urlencode(access)
-        url.searchParams.append("sig", await sign(secret, access_s))
+        url.searchParams.append("sig", sig)
         url.searchParams.append("access", access_s)
 
         url = url.toString()

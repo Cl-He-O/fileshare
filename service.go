@@ -19,6 +19,9 @@ var upload []byte
 //go:embed web/generate.html
 var generate []byte
 
+//go:embed web/form.css
+var form []byte
+
 func decode_access(key []byte, r *http.Request) *Access {
 	q := r.URL.Query()
 
@@ -116,7 +119,7 @@ func serve(config Config) {
 				return
 			}
 
-			w.Write(upload)
+			content_handler(".html", upload)(w, r)
 		}
 	})
 
@@ -147,15 +150,12 @@ func serve(config Config) {
 			w.Header().Set("Content-Type", info.ContentType)
 			w.Header().Set("Content-Disposition", info.Metadata.Get("Content-Disposition"))
 
-			http.ServeContent(w, r, "", time.Time{}, object)
+			http.ServeContent(w, r, "", info.LastModified, object)
 		}
 	})
 
-	http.HandleFunc("/gen", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			w.Write(generate)
-		}
-	})
+	http.HandleFunc("/gen", content_handler(".html", generate))
+	http.HandleFunc("/gen/form.css", content_handler(".css", form))
 
 	err = http.ListenAndServe(config.Listen, nil)
 	slog.Error("ListenAndServe", "err", err)

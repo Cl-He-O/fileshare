@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
+	"net/http"
 	"net/url"
+	"time"
 
 	"golang.org/x/crypto/sha3"
 )
@@ -35,4 +38,10 @@ func sign_s(key []byte, s string) []byte {
 func add_flag(p *string, short string, long string, value string) {
 	flag.StringVar(p, short, value, "")
 	flag.StringVar(p, long, value, "")
+}
+
+func content_handler(name string, content []byte) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(content))
+	}
 }
