@@ -21,8 +21,13 @@
 
     <form>
       <div>
-        <label for="secret" class="form-label">Secret</label>
-        <input type="password" class="form-control is-valid" aria-label="Secret" id="secret" />
+        <label for="username" class="form-label">Username</label>
+        <input type="text" class="form-control" aria-label="Username" id="username" />
+      </div><br>
+
+      <div>
+        <label for="key" class="form-label">Key</label>
+        <input type="password" class="form-control is-valid" aria-label="Key" id="key" />
         <div class="invalid-feedback">
           Please enter a valid base64-encoded string
         </div>
@@ -61,6 +66,7 @@
     <script src="https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/dist/sha3.umd.min.js"></script>
 
     <script>
+      // workaround for encoding base64 binary data
       function b64urlencode(data) {
         if (typeof (data) != "string") {
           data = btoa(String.fromCharCode(...data))
@@ -76,11 +82,11 @@
         return data
       }
 
-      async function sign(secret, access_s) {
+      async function sign(key, access_s) {
         access_s = (new TextEncoder()).encode(access_s)
-        let data = new Uint8Array(secret.length + access_s.length)
-        data.set(secret, 0)
-        data.set(access_s, secret.length)
+        let data = new Uint8Array(key.length + access_s.length)
+        data.set(key, 0)
+        data.set(access_s, key.length)
 
         hasher = await hashwasm.createSHA3(256)
         hasher.init()
@@ -91,29 +97,31 @@
       }
 
       async function genqrcode(p) {
-        var secret
+        const username = document.getElementById("username").value
+
+        // decoding key
+        const key_e = document.getElementById("key")
+        var key
         try {
-          secret = atob(document.getElementById("secret").value)
+          key = atob(key_e.value)
         } catch (e) {
-          document.getElementById("secret").classList.replace("is-valid", "is-invalid")
+          key_e.classList.replace("is-valid", "is-invalid")
           return
         }
+        key_e.classList.replace("is-invalid", "is-valid")
 
-        document.getElementById("secret").classList.replace("is-invalid", "is-valid")
-
-        const bytes = new Uint8Array(secret.length);
-        for (let i = 0; i < secret.length; i++) {
-          bytes[i] = secret.charCodeAt(i);
+        // workaround for decoding base64 binary data
+        const bytes = new Uint8Array(key.length);
+        for (let i = 0; i < key.length; i++) {
+          bytes[i] = key.charCodeAt(i);
         }
-        secret = bytes
+        key = bytes
 
         const token = document.getElementById("token")
-
         if (token.value == "") {
           token.classList.replace("is-valid", "is-invalid")
           return
         }
-
         token.classList.replace("is-invalid", "is-valid")
 
         const duration_mins = document.getElementById("duration-minutes")
@@ -129,15 +137,16 @@
         }
 
         const access_s = b64urlencode(JSON.stringify(access))
-        const sig = await sign(secret, access_s)
+        const sig = await sign(key, access_s)
 
         let url = new URL(window.origin)
         if (p == "w") {
           url.pathname = "/upload"
         }
 
-        url.searchParams.append("sig", sig)
-        url.searchParams.append("access", access_s)
+        url.searchParams.set("username", username)
+        url.searchParams.set("sig", sig)
+        url.searchParams.set("access", access_s)
 
         url = url.toString()
 

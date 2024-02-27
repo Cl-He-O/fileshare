@@ -43,6 +43,7 @@
 
         <div class="grid">
             <button id="btn">Upload</button>
+            <button id="del">Delete</button>
         </div>
 
         <dialog id="dialog">
@@ -115,7 +116,7 @@
                     // hide progress bar
                     document.getElementById("progress").style.display = "none";
                     // enable button
-                    btn.setAttribute("diabled", false)
+                    btn.disabled = false
                 }
                 xhr.onerror = (e, a, b) => {
                     // reqeust failed
@@ -124,14 +125,43 @@
                     // hide progress bar
                     document.getElementById("progress").style.display = "none";
                     // enable button
-                    btn.setAttribute("diabled", false)
+                    btn.disabled = false
                 }
                 xhr.send(formData);
 
                 // show progress bar
                 document.getElementById("progress").style.display = "";
                 // disable button
-                btn.setAttribute("diabled", true)
+                btn.disabled = true
+            })
+
+            let del = document.getElementById("del")
+            del.addEventListener("click", () => {
+                let xhr = new XMLHttpRequest()
+                xhr.open('DELETE', '/upload' + location.search, true)
+                xhr.onload = e => {
+                    // request completed
+                    let data = JSON.parse(xhr.response)
+                    if (data.success) {
+                        showDialog("success", "Delete successful")
+                    } else {
+                        showDialog(data.message)
+                    }
+
+                    // enable button
+                    del.disabled = false
+                }
+                xhr.onerror = (e, a, b) => {
+                    // reqeust failed
+                    showDialog("network error")
+
+                    // enable button
+                    del.disabled = false
+                }
+                xhr.send()
+
+                // disable button
+                del.disabled = true
             })
 
             let upload = document.getElementById("upload")

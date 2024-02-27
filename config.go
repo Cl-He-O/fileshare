@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"log/slog"
 	"os"
 )
 
@@ -15,34 +16,43 @@ type ConfigMinio struct {
 }
 
 type Config struct {
-	Listen string      `json:"listen"`
-	Key    string      `json:"key"`
-	Minio  ConfigMinio `json:"minio"`
+	Listen string            `json:"listen"`
+	Users  map[string]string `json:"users"`
+	Minio  ConfigMinio       `json:"minio"`
 
-	key []byte
+	users map[string][]byte
 
-	// new command only
+	// "new" command only
 	URL string `json:"url"`
 }
 
 func parse_config(path string) Config {
 	config_file, err := os.Open(path)
 	if err != nil {
+		slog.Error("parse config: open config", "path", path)
 		panic(err)
 	}
 
 	var config Config
 	err = json.NewDecoder(config_file).Decode(&config)
 	if err != nil {
+		slog.Error("parse config: decode config", "path", path)
 		panic(err)
 	}
 
-	config.key, err = base64.StdEncoding.DecodeString(config.Key)
-	if err != nil {
-		panic(err)
+	config.users = map[string][]byte{}
+	// decode keys
+	for username, key := range config.Users {
+		config.users[username], err = base64.StdEncoding.DecodeString(key)
+		if err != nil {
+			slog.Error("parse config: decode key", "username", username, "key", key)
+			panic(err)
+		}
 	}
+	config.Users = nil
 
 	if config.Listen == "" {
+		slog.Info(`no listen set, default to ":8080"`)
 		config.Listen = ":8080"
 	}
 

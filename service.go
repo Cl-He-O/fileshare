@@ -22,8 +22,15 @@ var generate []byte
 //go:embed web/form.css
 var form []byte
 
-func decode_access(key []byte, r *http.Request) *Access {
+func decode_access(users map[string][]byte, r *http.Request) *Access {
 	q := r.URL.Query()
+
+	username := q.Get("username")
+	key, ok := users[username]
+	if !ok {
+		slog.Debug("invalid username")
+		return nil
+	}
 
 	csig_s := q.Get("sig")
 	access_s := q.Get("access")
@@ -76,26 +83,53 @@ func serve(config Config) {
 	}
 
 	http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			access := decode_access(config.key, r)
+		var access *Access
+		if r.Method == http.MethodDelete || r.Method == http.MethodPost || r.Method == http.MethodGet {
+			access = decode_access(config.users, r)
 			if access == nil {
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte{})
 				return
 			}
 
 			if access.Permission != "w" {
 				slog.Debug("no write permission")
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte{})
 				return
 			}
+		}
+		// access validated
 
+		if r.Method == http.MethodDelete {
+			err = mio.RemoveObject(config.Minio.Bucket, access.Token)
+
+			response := make(map[string]any)
+
+			if err != nil {
+				msg := "failed deleting file"
+				slog.Error("RemoveObject", "err", err)
+
+				response["message"] = msg
+			} else {
+				response["success"] = true
+			}
+
+			resp, _ := json.Marshal(response)
+			w.Write(resp)
+
+		} else if r.Method == http.MethodPost {
 			r.Body = http.MaxBytesReader(w, r.Body, access.MaxSize)
 
 			f, h, err := r.FormFile("file")
 			if err != nil {
-				slog.Debug("FormFile", "err", err)
+				slog.Error("FormFile", "err", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(fmt.Errorf("could not get form file: %s", err).Error()))
 				return
 			}
 
-			slog.Debug("uploading", "filename", h.Filename)
+			slog.Info("uploading", "filename", h.Filename)
 
 			cd := mime.FormatMediaType("attachment", map[string]string{"filename": h.Filename})
 			opts := minio.PutObjectOptions{ContentDisposition: cd, ContentType: h.Header.Get("Content-Type")}
@@ -114,36 +148,35 @@ func serve(config Config) {
 			resp, _ := json.Marshal(response)
 			w.Write(resp)
 		} else if r.Method == http.MethodGet {
-			access := decode_access(config.key, r)
-			if access == nil {
-				return
-			}
-
 			content_handler(".html", upload)(w, r)
 		}
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			access := decode_access(config.key, r)
+			access := decode_access(config.users, r)
 			if access == nil {
 				return
 			}
 
 			if access.Permission != "r" {
-				slog.Debug("no read permission")
+				slog.Error("no read permission")
 				return
 			}
 
 			object, err := mio.GetObject(config.Minio.Bucket, access.Token, minio.GetObjectOptions{})
 			if err != nil {
-				slog.Warn("GetObject", "err", err)
+				slog.Error("GetObject", "err", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(fmt.Errorf("could not get object: %w", err).Error()))
 				return
 			}
 
 			info, err := object.Stat()
 			if err != nil {
-				slog.Warn("Stat", "err", err)
+				slog.Error("Stat", "err", err)
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte(fmt.Errorf("could not stat object: %w", err).Error()))
 				return
 			}
 

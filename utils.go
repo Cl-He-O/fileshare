@@ -14,7 +14,7 @@ import (
 
 var b64 = base64.RawURLEncoding
 
-func sign(key []byte, access Access) url.Values {
+func sign(username string, key []byte, access Access) url.Values {
 	access_b, err := json.Marshal(access)
 	if err != nil {
 		panic(err)
@@ -24,6 +24,7 @@ func sign(key []byte, access Access) url.Values {
 	sig := b64.EncodeToString(sign_s(key, access_s))
 
 	query := make(url.Values)
+	query.Set("username", username)
 	query.Set("sig", sig)
 	query.Set("access", access_s)
 

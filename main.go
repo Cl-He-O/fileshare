@@ -33,6 +33,7 @@ func main() {
 
 	var (
 		config_path string
+		username    string
 		token       string
 		permission  string
 		duration_s  string
@@ -40,6 +41,7 @@ func main() {
 	)
 
 	add_flag(&config_path, "c", "config", "config.json")
+	add_flag(&username, "u", "username", "")
 	add_flag(&token, "t", "token", "")
 	add_flag(&permission, "p", "permission", "w")
 	add_flag(&duration_s, "d", "duration", "10m")
@@ -88,10 +90,15 @@ func main() {
 			if permission == "w" {
 				u = u.JoinPath("upload")
 			} else if permission != "r" {
-				panic(fmt.Sprintf("unsupported permission \"%s\", should be either \"w\" or \"r\"\n", permission))
+				panic(fmt.Errorf("unsupported permission \"%s\", should be either \"w\" or \"r\"", permission))
 			}
 
-			u.RawQuery = sign(config.key, access).Encode()
+			key, ok := config.users[username]
+			if !ok {
+				panic(fmt.Errorf("invalid username \"%s\"", username))
+			}
+
+			u.RawQuery = sign(username, key, access).Encode()
 			fmt.Println(u)
 		}
 	}
