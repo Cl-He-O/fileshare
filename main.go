@@ -21,6 +21,8 @@ type Access struct {
 	Until      int64  `json:"u"`
 	MaxSize    int64  `json:"s"`
 	Permission string `json:"p"`
+
+	path string
 }
 
 func main() {
@@ -76,7 +78,7 @@ func main() {
 				panic(err)
 			}
 
-			if permission == "r" {
+			if permission == PERMISSION_READ {
 				max_size = 0
 			}
 
@@ -87,9 +89,9 @@ func main() {
 				panic(err)
 			}
 
-			if permission == "w" {
+			if permission == PERMISSION_WRITE {
 				u = u.JoinPath("upload")
-			} else if permission != "r" {
+			} else if permission != PERMISSION_READ {
 				panic(fmt.Errorf("unsupported permission \"%s\", should be either \"w\" or \"r\"", permission))
 			}
 

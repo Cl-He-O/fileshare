@@ -8,10 +8,18 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/minio/minio-go"
 )
+
+const (
+	PERMISSION_WRITE permission = "w"
+	PERMISSION_READ  permission = "r"
+)
+
+type permission = string
 
 //go:embed web/upload.html
 var upload []byte
@@ -22,14 +30,16 @@ var generate []byte
 //go:embed web/form.css
 var form []byte
 
-func decode_access(users map[string][]byte, r *http.Request) *Access {
+func validate_access(users map[string][]byte, r *http.Request, perm_required permission) (*Access, string) {
 	q := r.URL.Query()
+
+	msg_forbidden := "Forbidden"
 
 	username := q.Get("username")
 	key, ok := users[username]
 	if !ok {
 		slog.Debug("invalid username")
-		return nil
+		return nil, msg_forbidden
 	}
 
 	csig_s := q.Get("sig")
@@ -38,34 +48,48 @@ func decode_access(users map[string][]byte, r *http.Request) *Access {
 	csig, err := b64.DecodeString(csig_s)
 	if err != nil {
 		slog.Debug("csig DecodeString", "err", err)
-		return nil
+		return nil, msg_forbidden
 	}
 
 	sig := sign_s(key, access_s)
 	if subtle.ConstantTimeCompare(sig, csig) != 1 {
 		slog.Debug("invalid signature")
-		return nil
+		return nil, msg_forbidden
 	}
 
 	access_b, err := b64.DecodeString(access_s)
 	if err != nil {
 		slog.Debug("access_b DecodeString", "err", err)
-		return nil
+		return nil, msg_forbidden
 	}
 
 	var access Access
 	err = json.Unmarshal(access_b, &access)
 	if err != nil {
 		slog.Debug("Unmarshal", "err", err)
-		return nil
+		return nil, msg_forbidden
 	}
 
 	if time.Now().Unix() > access.Until {
 		slog.Debug("token expired")
-		return nil
+		return nil, msg_forbidden
 	}
 
-	return &access
+	if perm_required != access.Permission {
+		slog.Debug("no permission", "perm_required", perm_required, "access.Permission", access.Permission)
+		return nil, msg_forbidden
+	}
+
+	if filepath.Base(access.Token) != access.Token {
+		slog.Debug("invalid token", "access.Token", access.Token)
+		return nil, "Token is not a valid filename"
+	}
+
+	access.path = filepath.Join(username, access.Token)
+
+	slog.Info("new access", "access.path", access.path, "access.Permission", access.Permission)
+
+	return &access, ""
 }
 
 func serve(config Config) {
@@ -84,30 +108,25 @@ func serve(config Config) {
 
 	http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
 		var access *Access
+
 		if r.Method == http.MethodDelete || r.Method == http.MethodPost || r.Method == http.MethodGet {
-			access = decode_access(config.users, r)
+			var err string
+			access, err = validate_access(config.users, r, PERMISSION_WRITE)
 			if access == nil {
 				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte{})
-				return
-			}
-
-			if access.Permission != "w" {
-				slog.Debug("no write permission")
-				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte{})
+				w.Write([]byte(err))
 				return
 			}
 		}
 		// access validated
 
 		if r.Method == http.MethodDelete {
-			err = mio.RemoveObject(config.Minio.Bucket, access.Token)
+			err = mio.RemoveObject(config.Minio.Bucket, access.path)
 
 			response := make(map[string]any)
 
 			if err != nil {
-				msg := "failed deleting file"
+				msg := "failed to delete file"
 				slog.Error("RemoveObject", "err", err)
 
 				response["message"] = msg
@@ -125,7 +144,7 @@ func serve(config Config) {
 			if err != nil {
 				slog.Error("FormFile", "err", err)
 				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(fmt.Errorf("could not get form file: %s", err).Error()))
+				w.Write([]byte(fmt.Sprintf("Could not get form file: %s", err)))
 				return
 			}
 
@@ -136,10 +155,10 @@ func serve(config Config) {
 
 			response := make(map[string]any)
 
-			_, err = mio.PutObject(config.Minio.Bucket, access.Token, f, h.Size, opts)
+			_, err = mio.PutObject(config.Minio.Bucket, access.path, f, h.Size, opts)
 			if err != nil {
 				msg := "failed uploading to storage"
-				slog.Warn(msg, "err", err)
+				slog.Error(msg, "err", err)
 				response["message"] = msg
 			} else {
 				response["success"] = true
@@ -154,21 +173,20 @@ func serve(config Config) {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			access := decode_access(config.users, r)
+			access, err_ := validate_access(config.users, r, PERMISSION_READ)
 			if access == nil {
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(err_))
 				return
 			}
 
-			if access.Permission != "r" {
-				slog.Error("no read permission")
-				return
-			}
+			// access validated
 
-			object, err := mio.GetObject(config.Minio.Bucket, access.Token, minio.GetObjectOptions{})
+			object, err := mio.GetObject(config.Minio.Bucket, access.path, minio.GetObjectOptions{})
 			if err != nil {
 				slog.Error("GetObject", "err", err)
 				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(fmt.Errorf("could not get object: %w", err).Error()))
+				w.Write([]byte(fmt.Sprintf("Could not get object: %s", err)))
 				return
 			}
 
@@ -176,7 +194,7 @@ func serve(config Config) {
 			if err != nil {
 				slog.Error("Stat", "err", err)
 				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(fmt.Errorf("could not stat object: %w", err).Error()))
+				w.Write([]byte(fmt.Sprintf("Could not stat object: %s", err)))
 				return
 			}
 

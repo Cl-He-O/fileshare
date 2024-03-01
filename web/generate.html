@@ -68,11 +68,11 @@
     <script>
       // workaround for encoding base64 binary data
       function b64urlencode(data) {
-        if (typeof (data) != "string") {
-          data = btoa(String.fromCharCode(...data))
-        } else {
-          data = btoa(data)
+        if (typeof (data) == "string") {
+          data = (new TextEncoder()).encode(data)
         }
+
+        data = btoa(String.fromCharCode(...data))
 
         // url safe
         data = data.replace(/\+/g, '-').replace(/\//g, '_');
