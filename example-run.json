@@ -1,5 +1,7 @@
 {
-  "key": "m184N23vhPbm0ZQNfCY3J425qgXGJyo3Iy4S_NrrWoA",
+  "users": {
+    "x": "lIfkmBIdYis+yQ93Rh/1wBaKV2l+8lwbDLSeH9vj1lw="
+  },
   "listen": "127.0.0.1:8080",
   "minio": {
     "endpoint": "127.0.0.1:9000",
