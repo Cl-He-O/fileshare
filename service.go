@@ -82,7 +82,7 @@ func validate_access(users map[string][]byte, r *http.Request, perm_required per
 
 	if filepath.Base(access.Token) != access.Token {
 		slog.Debug("invalid token", "access.Token", access.Token)
-		return nil, "Token is not a valid filename"
+		return nil, fmt.Sprintf("\"%s\" is not a valid filename", access.Token)
 	}
 
 	access.path = filepath.Join(username, access.Token)
@@ -90,6 +90,12 @@ func validate_access(users map[string][]byte, r *http.Request, perm_required per
 	slog.Info("new access", "access.path", access.path, "access.Permission", access.Permission)
 
 	return &access, ""
+}
+
+func respond_text(w http.ResponseWriter, status int, text string) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(status)
+	w.Write([]byte(text))
 }
 
 func serve(config Config) {
@@ -113,8 +119,7 @@ func serve(config Config) {
 			var err string
 			access, err = validate_access(config.users, r, PERMISSION_WRITE)
 			if access == nil {
-				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte(err))
+				respond_text(w, http.StatusForbidden, err)
 				return
 			}
 		}
@@ -143,8 +148,7 @@ func serve(config Config) {
 			f, h, err := r.FormFile("file")
 			if err != nil {
 				slog.Error("FormFile", "err", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(fmt.Sprintf("Could not get form file: %s", err)))
+				respond_text(w, http.StatusInternalServerError, fmt.Sprintf("Could not get form file: %s", err))
 				return
 			}
 
@@ -174,9 +178,10 @@ func serve(config Config) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			access, err_ := validate_access(config.users, r, PERMISSION_READ)
+
+			w.Header().Set("Content-Type", "application/javascript")
 			if access == nil {
-				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte(err_))
+				respond_text(w, http.StatusForbidden, err_)
 				return
 			}
 
@@ -185,16 +190,14 @@ func serve(config Config) {
 			object, err := mio.GetObject(config.Minio.Bucket, access.path, minio.GetObjectOptions{})
 			if err != nil {
 				slog.Error("GetObject", "err", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(fmt.Sprintf("Could not get object: %s", err)))
+				respond_text(w, http.StatusInternalServerError, fmt.Sprintf("Could not get object: %s", err))
 				return
 			}
 
 			info, err := object.Stat()
 			if err != nil {
 				slog.Error("Stat", "err", err)
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(fmt.Sprintf("Could not stat object: %s", err)))
+				respond_text(w, http.StatusNotFound, fmt.Sprintf("Could not stat object: %s", err))
 				return
 			}
 
