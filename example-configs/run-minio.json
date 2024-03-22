@@ -1,0 +1,17 @@
+{
+  "users": {
+    "x": "lIfkmBIdYis+yQ93Rh/1wBaKV2l+8lwbDLSeH9vj1lw="
+  },
+  "listen": "127.0.0.1:8080",
+  "db": "fileshare.db",
+  "storage": {
+    "type": "minio",
+    "minioSettings": {
+      "endpoint": "127.0.0.1:9000",
+      "id": "lmiq34AWOxfE8G1RiXKy",
+      "secret": "dcg1fiISO5V2Xgktx60ArERiYRFcALhjK2RpkXc1",
+      "bucket": "test",
+      "usessl": false
+    }
+  }
+}

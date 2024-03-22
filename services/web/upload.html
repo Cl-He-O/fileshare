@@ -32,9 +32,14 @@
                     <span id="filename"></span>
                 </div>
             </div>
-        </article>
+        </article><br>
 
-        <br>
+        <div>
+            <label>
+                <input type="checkbox" id="preview_download">
+                Enable preview when download
+            </label>
+        </div><br>
 
         <div id="progress" style="display: none;">
             Uploading...
@@ -96,9 +101,12 @@
                 let formData = new FormData()
                 formData.set("file", file)
 
+                let params = new URLSearchParams(location.search)
+                params.set("preview", document.getElementById("preview_download").checked)
+
                 // post
                 let xhr = new XMLHttpRequest();
-                xhr.open('POST', '/upload' + location.search, true);
+                xhr.open('POST', '/upload?' + params.toString(), true);
                 xhr.upload.onprogress = e => {
                     // update progress bar
                     let progess = Math.floor((e.loaded / e.total) * 100)

@@ -10,19 +10,16 @@ import (
 	"os"
 	"time"
 
+	"github.com/Cl-He-O/fileshare/services"
 	"github.com/dustin/go-humanize"
 )
 
 //go:embed help.txt
 var help string
 
-type Access struct {
-	Token      string `json:"t"`
-	Until      int64  `json:"u"`
-	MaxSize    int64  `json:"s"`
-	Permission string `json:"p"`
-
-	path string
+func add_flag(p *string, short string, long string, value string) {
+	flag.StringVar(p, short, value, "")
+	flag.StringVar(p, long, value, "")
 }
 
 func main() {
@@ -51,19 +48,19 @@ func main() {
 
 	flag.CommandLine.Parse(os.Args[2:])
 
-	config := parse_config(config_path)
+	config := services.ParseConfig(config_path)
 
 	switch os.Args[1] {
 	case "run":
 		{
-			serve(config)
+			services.Serve(config)
 		}
 	case "new":
 		{
 			if token == "" {
 				t := make([]byte, 8)
 				rand.Read(t)
-				token = b64.EncodeToString(t)
+				token = services.B64.EncodeToString(t)
 
 				fmt.Fprintln(os.Stderr, token)
 			}
@@ -78,29 +75,29 @@ func main() {
 				panic(err)
 			}
 
-			if permission == PERMISSION_READ {
+			if permission == services.PERMISSION_READ {
 				max_size = 0
 			}
 
-			access := Access{Token: token, Until: time.Now().Add(duration).Unix(), MaxSize: int64(max_size), Permission: permission}
+			access := services.Access{Token: token, Until: time.Now().Add(duration).Unix(), MaxSize: int64(max_size), Permission: permission}
 
 			u, err := url.Parse(config.URL)
 			if err != nil {
 				panic(err)
 			}
 
-			if permission == PERMISSION_WRITE {
+			if permission == services.PERMISSION_WRITE {
 				u = u.JoinPath("upload")
-			} else if permission != PERMISSION_READ {
+			} else if permission != services.PERMISSION_READ {
 				panic(fmt.Errorf("unsupported permission \"%s\", should be either \"w\" or \"r\"", permission))
 			}
 
-			key, ok := config.users[username]
+			key, ok := config.Users[username]
 			if !ok {
 				panic(fmt.Errorf("invalid username \"%s\"", username))
 			}
 
-			u.RawQuery = sign(username, key, access).Encode()
+			u.RawQuery = services.Sign(username, key, access).Encode()
 			fmt.Println(u)
 		}
 	}

@@ -1,0 +1,13 @@
+{
+  "users": {
+    "x": "lIfkmBIdYis+yQ93Rh/1wBaKV2l+8lwbDLSeH9vj1lw="
+  },
+  "listen": "127.0.0.1:8080",
+  "db": "fileshare.db",
+  "storage": {
+    "type": "local",
+    "localSettings": {
+      "path": "/tmp/fileshare"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-package main
+package services
 
 import (
 	"encoding/base64"
@@ -7,7 +7,12 @@ import (
 	"os"
 )
 
-type ConfigMinio struct {
+const (
+	STORAGE_TYPE_MINIO = "minio"
+	STORAGE_TYPE_LOCAL = "local"
+)
+
+type ConfigStorageMinio struct {
 	Endpoint string `json:"endpoint"`
 	ID       string `json:"id"`
 	Secret   string `json:"secret"`
@@ -15,18 +20,29 @@ type ConfigMinio struct {
 	UseSSL   bool   `json:"use_ssl"`
 }
 
-type Config struct {
-	Listen string            `json:"listen"`
-	Users  map[string]string `json:"users"`
-	Minio  ConfigMinio       `json:"minio"`
+type ConfigStorageLocal struct {
+	Path string `json:"path"`
+}
 
-	users map[string][]byte
+type ConfigStorage struct {
+	Type        string             `json:"type"`
+	ConfigLocal ConfigStorageLocal `json:"localSettings"`
+	ConfigMinio ConfigStorageMinio `json:"minioSettings"`
+}
+
+type Config struct {
+	Listen       string            `json:"listen"`
+	UsersStr     map[string]string `json:"users"`
+	DatabasePath string            `json:"db"`
+	Storage      ConfigStorage     `json:"storage"`
+
+	Users map[string][]byte
 
 	// "new" command only
 	URL string `json:"url"`
 }
 
-func parse_config(path string) Config {
+func ParseConfig(path string) Config {
 	config_file, err := os.Open(path)
 	if err != nil {
 		slog.Error("parse config: open config", "path", path)
@@ -40,16 +56,16 @@ func parse_config(path string) Config {
 		panic(err)
 	}
 
-	config.users = map[string][]byte{}
+	config.Users = map[string][]byte{}
 	// decode keys
-	for username, key := range config.Users {
-		config.users[username], err = base64.StdEncoding.DecodeString(key)
+	for username, key := range config.UsersStr {
+		config.Users[username], err = base64.StdEncoding.DecodeString(key)
 		if err != nil {
 			slog.Error("parse config: decode key", "username", username, "key", key)
 			panic(err)
 		}
 	}
-	config.Users = nil
+	config.UsersStr = nil
 
 	if config.Listen == "" {
 		slog.Info(`no listen set, default to ":8080"`)
