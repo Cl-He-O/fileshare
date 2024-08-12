@@ -33,12 +33,10 @@
         </div>
       </div><br>
 
-      <div>
-        <label for="token" class="form-label">Token</label>
-        <input type="text" class="form-control is-valid" aria-label="Token" id="token" />
-        <div class="invalid-feedback">
-          Please provide token
-        </div>
+      <label for="token" class="form-label">Token</label>
+      <input type="text" class="form-control is-valid" aria-label="Token" id="token" />
+      <div class="invalid-feedback">
+        Please provide token
       </div><br>
 
       <div>
@@ -46,6 +44,10 @@
         <input type="number" class="form-control" placeholder="10" aria-label="Duration in minutes"
           id="duration-minutes" />
       </div><br>
+
+      <label>
+        <input type="checkbox" id="view-once" />Can only be viewed once
+      </label><br>
 
       <div>
         <label for="max-size" class="form-label">Maximum size (megabytes)</label>
@@ -125,6 +127,7 @@
         token.classList.replace("is-invalid", "is-valid")
 
         const duration_mins = document.getElementById("duration-minutes")
+        const view_once = document.getElementById("view-once")
         const max_size = document.getElementById("max-size")
 
         const access = {
@@ -134,6 +137,7 @@
         }
         if (p == "w") {
           access.s = Math.floor((max_size.value || max_size.placeholder) * 1000000)
+          access.v = view_once.checked
         }
 
         const access_s = b64urlencode(JSON.stringify(access))

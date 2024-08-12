@@ -31,6 +31,7 @@ type Access struct {
 	Token      string `json:"t"`
 	Until      int64  `json:"u"`
 	MaxSize    int64  `json:"s"`
+	ViewOnce   bool   `json:"v"`
 	Permission string `json:"p"`
 
 	path string
@@ -40,6 +41,7 @@ type FileMetadata struct {
 	Filename string `json:"f"`
 	Preview  bool   `json:"p"`
 	Expire   int64  `json:"e"`
+	ViewOnce bool   `json:"v"`
 }
 
 func Serve(config Config) {
@@ -97,8 +99,7 @@ func Serve(config Config) {
 		if r.Method == http.MethodDelete || r.Method == http.MethodPost {
 			ok := access_lock.TryLock(access.path)
 			if !ok {
-				msg := "there is currently a upload/download session"
-				respond_message(w, msg, false)
+				respond_message(w, "there is currently a upload/download session", false)
 				return
 			}
 			defer access_lock.Unlock(access.path)
@@ -140,7 +141,7 @@ func Serve(config Config) {
 			slog.Info("storing", "filename", h.Filename)
 
 			err = db.Update(func(tx *bbolt.Tx) error {
-				v, _ := json.Marshal(FileMetadata{Filename: h.Filename, Preview: preview, Expire: access.Until})
+				v, _ := json.Marshal(FileMetadata{Filename: h.Filename, Preview: preview, Expire: access.Until, ViewOnce: access.ViewOnce})
 				return tx.Bucket(metabucket).Put([]byte(access.path), v)
 			})
 			if err != nil {
@@ -209,6 +210,27 @@ func Serve(config Config) {
 				slog.Error("get record", "err", err)
 				respond_text(w, http.StatusInternalServerError, "Could not get record")
 				return
+			}
+
+			if m.ViewOnce {
+				slog.Info("once", "m", m)
+
+				err_db := db.Update(func(tx *bbolt.Tx) error {
+					return tx.Bucket(metabucket).Delete([]byte(access.path))
+				})
+
+				if err_db != nil {
+					slog.Error("delete record", "err", err)
+					respond_text(w, http.StatusInternalServerError, "Could not delete record")
+					return
+				}
+
+				defer func() {
+					err = storage.delete(access.path)
+					if err != nil {
+						slog.Error("storage.delete", "err", err)
+					}
+				}()
 			}
 
 			if !m.Preview {
